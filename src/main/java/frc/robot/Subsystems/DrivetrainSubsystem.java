@@ -321,7 +321,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
     private final double m_moduleOffset;
 
     private final PIDController m_drivePIDController = new PIDController(0.0, 0, 0);
-    private final PIDController m_turningPIDController = new PIDController(.3, 0, 0.05);
+    private final PIDController m_turningPIDController = new PIDController(1, 0, 0.05);
     private final SimpleMotorFeedforward m_driveFeedforward = new SimpleMotorFeedforward(0.1, 2.4);
 
     /**
@@ -364,7 +364,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
 
     turnTalonConfig.TorqueCurrent.PeakForwardTorqueCurrent = 40.0;
     turnTalonConfig.TorqueCurrent.PeakReverseTorqueCurrent = -40.0;
-    // turnTalonConfig.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
+    turnTalonConfig.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
     
         // config.turnMotorInverted()
         //     ? InvertedValue.Clockwise_Positive
@@ -445,7 +445,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
       // Calculates the turning motor output from the variable turning PID controller.
       
       final double turnOutput = m_turningPIDController.calculate(Units.rotationsToRadians(turnPosition.getValueAsDouble() - m_moduleOffset), state.angle.getRadians());
-      turnTalon.set(turnOutput);
+      turnTalon.set(turnOutput/2);
 
       // Updates velocity based on turn error.
       state.speedMetersPerSecond *= Math.cos(getState().angle.getRadians() - state.angle.getRadians());
