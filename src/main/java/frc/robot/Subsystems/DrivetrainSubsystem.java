@@ -113,7 +113,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
     SignalLogger.start();
 
     
-    m_frontLeft = new SwerveModule(Constants.FRONT_LEFT_MODULE_DRIVE_MOTOR, Constants.FRONT_LEFT_MODULE_STEER_MOTOR, Constants.FRONT_LEFT_MODULE_STEER_ENCODER, Constants.FRONT_LEFT_MODULE_STEER_OFFSET);
+    m_frontLeft = new SwerveModule(Constants.FRONT_LEFT_MODULE_DRIVE_MOTOR, Constants.FRONT_LEFT_MODULE_STEER_MOTOR, Constants.FRONT_LEFT_MODULE_STEER_ENCODER, Constants.FRONT_LEFT_MODULE_STEER_OFFSET,);
     m_frontRight = new SwerveModule(Constants.FRONT_RIGHT_MODULE_DRIVE_MOTOR, Constants.FRONT_RIGHT_MODULE_STEER_MOTOR, Constants.FRONT_RIGHT_MODULE_STEER_ENCODER, Constants.FRONT_RIGHT_MODULE_STEER_OFFSET);
     m_backLeft = new SwerveModule(Constants.BACK_LEFT_MODULE_DRIVE_MOTOR, Constants.BACK_LEFT_MODULE_STEER_MOTOR, Constants.BACK_LEFT_MODULE_STEER_ENCODER, Constants.BACK_LEFT_MODULE_STEER_OFFSET);
     m_backRight = new SwerveModule(Constants.BACK_RIGHT_MODULE_DRIVE_MOTOR, Constants.BACK_RIGHT_MODULE_STEER_MOTOR, Constants.BACK_RIGHT_MODULE_STEER_ENCODER, Constants.BACK_RIGHT_MODULE_STEER_OFFSET);
@@ -249,6 +249,8 @@ public class DrivetrainSubsystem extends SubsystemBase {
 
     // WPILib
     
+    SwerveDriveKinematics.desaturateWheelSpeeds(swerveModuleStates, kMaxSpeed);
+
     publisher2.set(new SwerveModuleState[]{
       m_frontLeft.getState(),
       m_frontRight.getState(),
@@ -266,7 +268,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
     });
 
     
-    SwerveDriveKinematics.desaturateWheelSpeeds(swerveModuleStates, kMaxSpeed);
+    
     frontleftstuff = m_frontLeft.setDesiredState(swerveModuleStates[0]);
     frontrightstuff = m_frontRight.setDesiredState(swerveModuleStates[1]);
     backleftstuff = m_backLeft.setDesiredState(swerveModuleStates[2]);
@@ -321,7 +323,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
     private final double m_moduleOffset;
 
     private final PIDController m_drivePIDController = new PIDController(0.0, 0, 0);
-    private final PIDController m_turningPIDController = new PIDController(1, 0, 0.05);
+    private final PIDController m_turningPIDController = new PIDController(1.25, 0, 0.05);
     private final SimpleMotorFeedforward m_driveFeedforward = new SimpleMotorFeedforward(0.1, 2.4);
 
     /**
@@ -332,7 +334,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
      * @param turningEncoderChannel The CAN input for the turning encoder.
      * @param moduleOffset The angle offset for the turning encoder (rot).
      */
-    private SwerveModule(int driveMotorChannel, int turningMotorChannel, int turningEncoderChannel, double moduleOffset) {
+    private SwerveModule(int driveMotorChannel, int turningMotorChannel, int turningEncoderChannel, double moduleOffset, boolean driveReversed) {
       // m_driveMotor = new CANSparkMax(driveMotorChannel, MotorType.kBrushless);
       // m_turningMotor = new CANSparkMax(turningMotorChannel, MotorType.kBrushless);
 
