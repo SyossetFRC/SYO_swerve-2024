@@ -14,6 +14,7 @@ import com.ctre.phoenix6.StatusCode;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.hardware.TalonFX;
+import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import com.ctre.phoenix6.controls.*;
 import edu.wpi.first.math.util.Units;
@@ -285,7 +286,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
     private static final double kWheelRadius = Units.inchesToMeters(2); // meters
     private static final double kDriveGearRatio = ((13.0 / 50.0) * (28.0 / 16.0) * (15.0 / 45.0));
     // private static final double kDriveGearRatio = (50.0 / 14.0) * (16.0 / 28.0) * (45.0 / 15.0); Mechanical Advantage uses this, makes motors go supedr fast???
-    private static final double kSteerGearRatio = 1.0 / (7.0 / 150.0);
+    private static final double kSteerGearRatio = (7.0 / 150.0 * 13.0 / 14.0);
 
     private final TalonFXConfiguration driveTalonConfig = new TalonFXConfiguration();
     private final TalonFXConfiguration turnTalonConfig = new TalonFXConfiguration();
@@ -320,7 +321,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
     private final double m_moduleOffset;
 
     private final PIDController m_drivePIDController = new PIDController(0.0, 0, 0);
-    private final PIDController m_turningPIDController = new PIDController(.5, 0, 0.01);
+    private final PIDController m_turningPIDController = new PIDController(.3, 0, 0.05);
     private final SimpleMotorFeedforward m_driveFeedforward = new SimpleMotorFeedforward(0.1, 2.4);
 
     /**
@@ -363,16 +364,17 @@ public class DrivetrainSubsystem extends SubsystemBase {
 
     turnTalonConfig.TorqueCurrent.PeakForwardTorqueCurrent = 40.0;
     turnTalonConfig.TorqueCurrent.PeakReverseTorqueCurrent = -40.0;
-    // turnTalonConfig.MotorOutput.Inverted =
-    //     config.turnMotorInverted()
-    //         ? InvertedValue.Clockwise_Positive
-    //         : InvertedValue.CounterClockwise_Positive;
+    // turnTalonConfig.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
+    
+        // config.turnMotorInverted()
+        //     ? InvertedValue.Clockwise_Positive
+        //     : InvertedValue.CounterClockwise_Positive;
     turnTalonConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     driveTalonConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
 
     // Conversions affect getPosition()/setPosition() and getVelocity()
     driveTalonConfig.Feedback.SensorToMechanismRatio = (1.0/(kDriveGearRatio));
-    turnTalonConfig.Feedback.SensorToMechanismRatio = kSteerGearRatio;
+    turnTalonConfig.Feedback.SensorToMechanismRatio = (1.0/(kSteerGearRatio));
     
     turnTalonConfig.ClosedLoopGeneral.ContinuousWrap = true;
 
@@ -407,6 +409,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
       // alignTurningEncoders();
     }
 
+  
     /**
      * Returns the current state of the module.
      *
@@ -415,7 +418,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
     public SwerveModuleState getState() {
       driveVelocity.refresh();
       
-      return new SwerveModuleState((driveVelocity.getValueAsDouble() * 2 * Math.PI * kWheelRadius), Rotation2d.fromRotations(m_turningCANcoder.getAbsolutePosition().getValueAsDouble() - m_moduleOffset));
+      return new SwerveModuleState((driveVelocity.getValueAsDouble() * 2 * Math.PI * kWheelRadius), Rotation2d.fromRotations(turnPosition.getValueAsDouble() - m_moduleOffset));
       // return new SwerveModuleState((driveVelocity.getValueAsDouble()), Rotation2d.fromRadians(turnPosition.getValueAsDouble() /*- m_moduleOffset*/));
     }
 
@@ -425,7 +428,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
      * @return The current distance of the drive encoder in meters as a SwerveModulePosition.
      */
     public SwerveModulePosition getDrivePosition() {
-      return new SwerveModulePosition(drivePosition.getValueAsDouble(), Rotation2d.fromRotations(m_turningCANcoder.getAbsolutePosition().getValueAsDouble() - m_moduleOffset));
+      return new SwerveModulePosition(drivePosition.getValueAsDouble(), Rotation2d.fromRotations(turnPosition.getValueAsDouble() - m_moduleOffset));
     }
 
     /**
@@ -437,7 +440,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
       turnPosition.refresh();
       // Optimizes the reference state to avoid spinning further than 90 degrees.
       // SwerveModuleState state = SwerveModuleState.optimize(desiredState,  Rotation2d.fromRotations(m_turningCANcoder.getAbsolutePosition().getValueAsDouble() /*- m_moduleOffset*/));  USING CANCODER
-      SwerveModuleState state = SwerveModuleState.optimize(desiredState,  Rotation2d.fromRotations(turnPosition.getValueAsDouble()));
+      SwerveModuleState state = SwerveModuleState.optimize(desiredState,  Rotation2d.fromRotations(turnPosition.getValueAsDouble()- m_moduleOffset) );
 
       // Calculates the turning motor output from the variable turning PID controller.
       
@@ -450,7 +453,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
       // Calculates the drive output from the drive PID controller and feedforward controller.
       final double driveOutput = m_drivePIDController.calculate(driveVelocity.getValueAsDouble(), state.speedMetersPerSecond);
       final double driveFeedForward = m_driveFeedforward.calculate(state.speedMetersPerSecond);
-      driveTalon.setVoltage(Math.abs(state.speedMetersPerSecond) > 0.001 ? (driveFeedForward + driveOutput) : 0);
+      driveTalon.setVoltage((Math.abs(state.speedMetersPerSecond) > 0.001 ? (driveFeedForward + driveOutput) : 0));
 
       return new Double[] {turnOutput, driveOutput, turnPosition.getValueAsDouble()};
     }
