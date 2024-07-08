@@ -68,14 +68,12 @@ public class DrivetrainSubsystem extends SubsystemBase {
   private final Pigeon2 pigeon;
   private final StatusSignal<Double> yaw;
   
-  private final int m_currentLimit = 60;
 
   private final SwerveModule m_frontLeft;
   private final SwerveModule m_frontRight;
   private final SwerveModule m_backLeft;
   private final SwerveModule m_backRight;
 
-  private final AHRS m_navx = new AHRS(SPI.Port.kMXP, (byte) 200);
 
   private final SwerveDriveKinematics m_kinematics;
 
@@ -84,6 +82,9 @@ public class DrivetrainSubsystem extends SubsystemBase {
     .getStructArrayTopic("/DesiredSwerve", SwerveModuleState.struct).publish();
     StructArrayPublisher<SwerveModuleState> publisher2 = NetworkTableInstance.getDefault()
     .getStructArrayTopic("/ActualSwerve", SwerveModuleState.struct).publish();
+
+  StructArrayPublisher<Pose2d> posePublisher = NetworkTableInstance.getDefault()
+  .getStructArrayTopic("/OdometryPose2d", Pose2d.struct).publish();
 
   private final GenericEntry m_frontLeftDriveSpeedEntry;
   private final GenericEntry m_frontLeftSteerAngleEntry;
@@ -113,10 +114,10 @@ public class DrivetrainSubsystem extends SubsystemBase {
     SignalLogger.start();
 
     
-    m_frontLeft = new SwerveModule(Constants.FRONT_LEFT_MODULE_DRIVE_MOTOR, Constants.FRONT_LEFT_MODULE_STEER_MOTOR, Constants.FRONT_LEFT_MODULE_STEER_ENCODER, Constants.FRONT_LEFT_MODULE_STEER_OFFSET,);
-    m_frontRight = new SwerveModule(Constants.FRONT_RIGHT_MODULE_DRIVE_MOTOR, Constants.FRONT_RIGHT_MODULE_STEER_MOTOR, Constants.FRONT_RIGHT_MODULE_STEER_ENCODER, Constants.FRONT_RIGHT_MODULE_STEER_OFFSET);
-    m_backLeft = new SwerveModule(Constants.BACK_LEFT_MODULE_DRIVE_MOTOR, Constants.BACK_LEFT_MODULE_STEER_MOTOR, Constants.BACK_LEFT_MODULE_STEER_ENCODER, Constants.BACK_LEFT_MODULE_STEER_OFFSET);
-    m_backRight = new SwerveModule(Constants.BACK_RIGHT_MODULE_DRIVE_MOTOR, Constants.BACK_RIGHT_MODULE_STEER_MOTOR, Constants.BACK_RIGHT_MODULE_STEER_ENCODER, Constants.BACK_RIGHT_MODULE_STEER_OFFSET);
+    m_frontLeft = new SwerveModule(Constants.FRONT_LEFT_MODULE_DRIVE_MOTOR, Constants.FRONT_LEFT_MODULE_STEER_MOTOR, Constants.FRONT_LEFT_MODULE_STEER_ENCODER, Constants.FRONT_LEFT_MODULE_STEER_OFFSET, Constants.FRONT_LEFT_MODULE_DRIVE_REVERSED);
+    m_frontRight = new SwerveModule(Constants.FRONT_RIGHT_MODULE_DRIVE_MOTOR, Constants.FRONT_RIGHT_MODULE_STEER_MOTOR, Constants.FRONT_RIGHT_MODULE_STEER_ENCODER, Constants.FRONT_RIGHT_MODULE_STEER_OFFSET, Constants.FRONT_RIGHT_MODULE_DRIVE_REVERSED);
+    m_backLeft = new SwerveModule(Constants.BACK_LEFT_MODULE_DRIVE_MOTOR, Constants.BACK_LEFT_MODULE_STEER_MOTOR, Constants.BACK_LEFT_MODULE_STEER_ENCODER, Constants.BACK_LEFT_MODULE_STEER_OFFSET, Constants.BACK_LEFT_MODULE_DRIVE_REVERSED);
+    m_backRight = new SwerveModule(Constants.BACK_RIGHT_MODULE_DRIVE_MOTOR, Constants.BACK_RIGHT_MODULE_STEER_MOTOR, Constants.BACK_RIGHT_MODULE_STEER_ENCODER, Constants.BACK_RIGHT_MODULE_STEER_OFFSET, Constants.BACK_RIGHT_MODULE_DRIVE_REVERSED);
 
     m_kinematics = new SwerveDriveKinematics(m_frontLeftLocation, m_frontRightLocation, m_backLeftLocation, m_backRightLocation);
     
@@ -264,8 +265,9 @@ public class DrivetrainSubsystem extends SubsystemBase {
       swerveModuleStates[1],
       swerveModuleStates[2],
       swerveModuleStates[3]
-
     });
+
+    
 
     
     
@@ -273,12 +275,16 @@ public class DrivetrainSubsystem extends SubsystemBase {
     frontrightstuff = m_frontRight.setDesiredState(swerveModuleStates[1]);
     backleftstuff = m_backLeft.setDesiredState(swerveModuleStates[2]);
     backrightstuff = m_backRight.setDesiredState(swerveModuleStates[3]);
-
+    
     yaw.refresh();
     m_odometry.update(
         Rotation2d.fromDegrees(yaw.getValueAsDouble()),
         getModulePositions()
     );
+
+    posePublisher.set(new Pose2d[]{
+      m_odometry.getPoseMeters()
+    });
 
     updateShuffleboard();
   }
@@ -293,7 +299,16 @@ public class DrivetrainSubsystem extends SubsystemBase {
     private final TalonFXConfiguration driveTalonConfig = new TalonFXConfiguration();
     private final TalonFXConfiguration turnTalonConfig = new TalonFXConfiguration();
 
+    private final VoltageOut voltageControl = new VoltageOut(0).withUpdateFreqHz(0);
+    private final TorqueCurrentFOC currentControl = new TorqueCurrentFOC(0).withUpdateFreqHz(0);
+    private final VelocityTorqueCurrentFOC velocityTorqueCurrentFOC =
+      new VelocityTorqueCurrentFOC(0).withUpdateFreqHz(0);
+    private final PositionTorqueCurrentFOC positionControl =
+      new PositionTorqueCurrentFOC(0).withUpdateFreqHz(0);
+    private final NeutralOut neutralControl = new NeutralOut().withUpdateFreqHz(0);
+
     
+
     private final TalonFX driveTalon;
     private final TalonFX turnTalon;
   
@@ -334,7 +349,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
      * @param turningEncoderChannel The CAN input for the turning encoder.
      * @param moduleOffset The angle offset for the turning encoder (rot).
      */
-    private SwerveModule(int driveMotorChannel, int turningMotorChannel, int turningEncoderChannel, double moduleOffset, boolean driveReversed) {
+    private SwerveModule(int driveMotorChannel, int turningMotorChannel, int turningEncoderChannel, double moduleOffset, boolean driveReverse) {
       // m_driveMotor = new CANSparkMax(driveMotorChannel, MotorType.kBrushless);
       // m_turningMotor = new CANSparkMax(turningMotorChannel, MotorType.kBrushless);
 
@@ -361,11 +376,18 @@ public class DrivetrainSubsystem extends SubsystemBase {
     driveTalonConfig.TorqueCurrent.PeakForwardTorqueCurrent = 80.0;
     driveTalonConfig.TorqueCurrent.PeakReverseTorqueCurrent = -80.0;
     driveTalonConfig.ClosedLoopRamps.TorqueClosedLoopRampPeriod = 0.02;
-    
-
+    if (driveReverse)
+    {
+      driveTalonConfig.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
+    }
+    else{
+      driveTalonConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
+    }
 
     turnTalonConfig.TorqueCurrent.PeakForwardTorqueCurrent = 40.0;
     turnTalonConfig.TorqueCurrent.PeakReverseTorqueCurrent = -40.0;
+    
+
     turnTalonConfig.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
     
         // config.turnMotorInverted()
@@ -375,7 +397,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
     driveTalonConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
 
     // Conversions affect getPosition()/setPosition() and getVelocity()
-    driveTalonConfig.Feedback.SensorToMechanismRatio = (1.0/(kDriveGearRatio));
+    driveTalonConfig.Feedback.SensorToMechanismRatio = (1.0/((kDriveGearRatio) * 2 * Math.PI * kWheelRadius));
     turnTalonConfig.Feedback.SensorToMechanismRatio = (1.0/(kSteerGearRatio));
     
     turnTalonConfig.ClosedLoopGeneral.ContinuousWrap = true;
@@ -408,7 +430,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
 
       m_turningPIDController.enableContinuousInput(-Math.PI, Math.PI);
 
-      // alignTurningEncoders();
+      alignTurningEncoders();
     }
 
   
@@ -420,7 +442,7 @@ public class DrivetrainSubsystem extends SubsystemBase {
     public SwerveModuleState getState() {
       driveVelocity.refresh();
       
-      return new SwerveModuleState((driveVelocity.getValueAsDouble() * 2 * Math.PI * kWheelRadius), Rotation2d.fromRotations(turnPosition.getValueAsDouble() - m_moduleOffset));
+      return new SwerveModuleState((driveVelocity.getValueAsDouble()), Rotation2d.fromRotations(turnPosition.getValueAsDouble() - m_moduleOffset));
       // return new SwerveModuleState((driveVelocity.getValueAsDouble()), Rotation2d.fromRadians(turnPosition.getValueAsDouble() /*- m_moduleOffset*/));
     }
 
@@ -430,6 +452,8 @@ public class DrivetrainSubsystem extends SubsystemBase {
      * @return The current distance of the drive encoder in meters as a SwerveModulePosition.
      */
     public SwerveModulePosition getDrivePosition() {
+      drivePosition.refresh();
+
       return new SwerveModulePosition(drivePosition.getValueAsDouble(), Rotation2d.fromRotations(turnPosition.getValueAsDouble() - m_moduleOffset));
     }
 
