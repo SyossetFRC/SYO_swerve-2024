@@ -66,7 +66,7 @@ public class RobotContainer {
 
     m_intakeSubsystem.setDefaultCommand(new DefaultIntakeCommand(
         m_intakeSubsystem, 
-        () -> -DPADrightleft(m_driveController) * IntakeSubsystem.kIntakeMaxRate * 0.2, 
+        () -> -DPADrightleft(m_driveController) * IntakeSubsystem.kIntakeMaxRate * 0.4, 
         () -> getDPadInput(m_driveController) * IntakeSubsystem.kRotateMaxAngularSpeed * .3
     ));
 

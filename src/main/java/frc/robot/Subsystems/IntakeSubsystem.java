@@ -70,7 +70,7 @@ public class IntakeSubsystem extends SubsystemBase {
 
         m_lowLimitSwitch = new DigitalInput(Constants.LOW_LIMIT_SWITCH);
         m_highLimitSwitch = new DigitalInput(Constants.HIGH_LIMIT_SWITCH);
-        m_noteLimitSwitch = new DigitalInput(Constants.NOTE_LIMIT_SWITCH);
+        m_noteLimitSwitch = new DigitalInput(Constants.HIGH_LIMIT_SWITCH);
 
         m_Led = new AddressableLED(1);
         m_LedBuffer = new AddressableLEDBuffer(144);

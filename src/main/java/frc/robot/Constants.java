@@ -22,7 +22,7 @@ public final class Constants {
     public static final int BACK_LEFT_MODULE_DRIVE_MOTOR = 9;
     public static final int BACK_LEFT_MODULE_STEER_MOTOR = 2;
     public static final int BACK_LEFT_MODULE_STEER_ENCODER = 50;
-    public static final double BACK_LEFT_MODULE_STEER_OFFSET = 25 / 360.0; // Input between -180 and 180 degrees.
+    public static final double BACK_LEFT_MODULE_STEER_OFFSET = (20.0) / 360.0; // Input between -180 and 180 degrees.
 
     public static final int BACK_RIGHT_MODULE_DRIVE_MOTOR = 5;
     public static final int BACK_RIGHT_MODULE_STEER_MOTOR = 6;
@@ -33,7 +33,6 @@ public final class Constants {
     public static final int ROTATE_MOTOR = 41;
     public static final int LOW_LIMIT_SWITCH = 4;
     public static final int HIGH_LIMIT_SWITCH = 6;
-    public static final int NOTE_LIMIT_SWITCH = 0;
 
     public static final int OUTTAKE_MOTOR_1 = 60;
     public static final int OUTTAKE_MOTOR_2 = 23;
